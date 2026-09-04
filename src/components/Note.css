@@ -1,0 +1,192 @@
+/* Note.css */
+
+.note {
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: box-shadow 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), height 0.3s ease, transform 0.2s;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.note:hover { 
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.2) inset; 
+  transform: translateY(-2px);
+}
+
+.note.minimized { 
+  height: 48px !important; 
+  border-radius: 24px;
+}
+
+@keyframes shake {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  10% { transform: translate(-1px, -2px) rotate(-1deg); }
+  20% { transform: translate(-3px, 0px) rotate(1deg); }
+  30% { transform: translate(3px, 2px) rotate(0deg); }
+  40% { transform: translate(1px, -1px) rotate(1deg); }
+  50% { transform: translate(-1px, 2px) rotate(-1deg); }
+  60% { transform: translate(-3px, 1px) rotate(0deg); }
+  70% { transform: translate(3px, 1px) rotate(-1deg); }
+  80% { transform: translate(-1px, -1px) rotate(1deg); }
+  90% { transform: translate(1px, 2px) rotate(0deg); }
+  100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+.note.ringing {
+  animation: shake 0.5s infinite;
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.8);
+  border: 2px solid var(--danger-color);
+}
+
+.note-header {
+  height: 48px;
+  background: rgba(0, 0, 0, 0.08);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 16px;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  transition: background 0.3s;
+}
+
+.note-header:active { cursor: grabbing; }
+.note-header:hover { background: rgba(0, 0, 0, 0.15); }
+
+.note-actions {
+  display: flex;
+  gap: 12px;
+  opacity: 0.6;
+  transition: opacity 0.3s;
+}
+
+.note-header:hover .note-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  font-size: 18px;
+}
+
+.note.dark-text .action-btn { color: rgba(0, 0, 0, 0.7); }
+.note.light-text .action-btn { color: rgba(255, 255, 255, 0.85); }
+.action-btn:hover { transform: scale(1.25); }
+.note.dark-text .action-btn:hover { color: rgba(0, 0, 0, 1); }
+.note.light-text .action-btn:hover { color: rgba(255, 255, 255, 1); }
+
+.note-body {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.note-content, .note-markdown {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  resize: none;
+  padding: 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.7;
+  outline: none;
+  overflow-y: auto;
+}
+
+.note.dark-text .note-content, .note.dark-text .note-markdown { color: #1a1a1a; }
+.note.light-text .note-content, .note.light-text .note-markdown { color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.note.dark-text .note-content::placeholder { color: rgba(0, 0, 0, 0.4); }
+.note.light-text .note-content::placeholder { color: rgba(255, 255, 255, 0.7); }
+
+.note-markdown h1, .note-markdown h2, .note-markdown h3 { margin-bottom: 12px; margin-top: 12px; font-family: 'Outfit', sans-serif; font-weight: 600; }
+.note-markdown ul, .note-markdown ol { padding-left: 24px; margin-bottom: 12px; }
+.note-markdown p { margin-bottom: 12px; }
+.note-markdown a { color: inherit; font-weight: 600; text-decoration: underline; text-decoration-style: dotted; }
+
+.color-picker, .alarm-picker {
+  position: absolute;
+  background: var(--panel-bg);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: var(--glass-shadow);
+  z-index: 10;
+  animation: popInNote 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popInNote {
+  from { transform: scale(0.8) translateY(-10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.color-picker {
+  top: 55px;
+  left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 200px;
+}
+
+.alarm-picker {
+  top: 55px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-primary);
+}
+
+.color-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.color-dot:hover { 
+  transform: scale(1.2); 
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2); 
+}
+
+.alarm-picker input {
+  padding: 8px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border-radius: 8px;
+  outline: none;
+}
+.alarm-picker input:focus {
+  border-color: var(--accent-color);
+}
+.alarm-picker button {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.alarm-picker button:hover {
+  background: var(--accent-hover);
+}

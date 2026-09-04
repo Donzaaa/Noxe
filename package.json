@@ -1,0 +1,60 @@
+{
+  "name": "noxe",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Noxe Note App",
+  "author": "Donza",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"wait-on tcp:5833 && cross-env NODE_ENV=development electron .\"",
+    "test-peer": "cross-env NODE_ENV=development electron . --user-data-dir=C:\\temp\\noxe-peer2",
+    "build": "vite build && electron-builder",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "build": {
+    "appId": "com.noxe.chat",
+    "productName": "Noxe",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "extraResources": [
+      {
+        "from": "tor-bin",
+        "to": "tor-bin",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-icons": "^5.7.0",
+    "react-markdown": "^10.1.0",
+    "react-rnd": "^10.5.3",
+    "socks": "^2.8.10",
+    "tar": "^7.5.22",
+    "uuid": "^14.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^6.1.0",
+    "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
+    "electron": "^44.0.0",
+    "electron-builder": "^26.15.3",
+    "oxlint": "^1.79.0",
+    "png-to-ico": "^3.0.2",
+    "vite": "^8.2.2",
+    "wait-on": "^9.1.0"
+  }
+}
