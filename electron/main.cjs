@@ -4,7 +4,6 @@ const fs = require('fs');
 
 const isDev = process.env.NODE_ENV === 'development';
 const userDataPath = app.getPath('userData');
-const notesFilePath = path.join(userDataPath, 'notes.json');
 const settingsFilePath = path.join(userDataPath, 'settings.json');
 const chatFilePath = path.join(userDataPath, 'chat.json');
 
@@ -112,28 +111,6 @@ app.on('window-all-closed', () => {
   }
 });
 
-// IPC handlers for notes persistence
-ipcMain.handle('load-notes', () => {
-  try {
-    if (fs.existsSync(notesFilePath)) {
-      const data = fs.readFileSync(notesFilePath, 'utf-8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Failed to load notes:', error);
-  }
-  return [];
-});
-
-ipcMain.handle('save-notes', (event, notes) => {
-  try {
-    fs.writeFileSync(notesFilePath, JSON.stringify(notes, null, 2));
-    return true;
-  } catch (error) {
-    console.error('Failed to save notes:', error);
-    return false;
-  }
-});
 
 ipcMain.handle('toggle-always-on-top', (event, isAlwaysOnTop) => {
   if (mainWindow) {

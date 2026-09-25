@@ -71,3 +71,6 @@ The compiled application will be available in the `release/` directory.
 ## Contributing
 
 Contributions are welcome! Feel free to open issues or submit pull requests for bug fixes, new features, or UX improvements.
+## License
+
+Please refer to the LICENSE file for more information.

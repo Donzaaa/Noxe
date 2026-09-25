@@ -1,41 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { MdAdd, MdPushPin, MdSettings, MdSearch, MdDelete, MdRestore, MdDeleteForever, MdClose, MdChat, MdStickyNote2, MdRemove, MdCropSquare, MdTerminal, MdRefresh } from 'react-icons/md';
-import Note from './components/Note';
+import { MdSettings, MdClose, MdRemove, MdCropSquare, MdTerminal, MdRefresh } from 'react-icons/md';
 import Chat from './components/Chat';
 import { translations } from './i18n';
 import './index.css';
 
-const NOTE_COLORS = [
-  { id: 'yellow', bg: 'linear-gradient(135deg, rgba(253, 230, 138, 0.9), rgba(252, 211, 77, 0.9))', text: 'dark' },
-  { id: 'peach', bg: 'linear-gradient(135deg, rgba(254, 215, 170, 0.9), rgba(253, 186, 116, 0.9))', text: 'dark' },
-  { id: 'orange', bg: 'linear-gradient(135deg, rgba(253, 186, 116, 0.9), rgba(251, 146, 60, 0.9))', text: 'dark' },
-  { id: 'red', bg: 'linear-gradient(135deg, rgba(254, 202, 202, 0.9), rgba(252, 165, 165, 0.9))', text: 'dark' },
-  { id: 'pink', bg: 'linear-gradient(135deg, rgba(251, 207, 232, 0.9), rgba(244, 114, 182, 0.9))', text: 'dark' },
-  { id: 'purple', bg: 'linear-gradient(135deg, rgba(233, 213, 255, 0.9), rgba(216, 180, 254, 0.9))', text: 'dark' },
-  { id: 'indigo', bg: 'linear-gradient(135deg, rgba(199, 210, 254, 0.9), rgba(165, 180, 252, 0.9))', text: 'dark' },
-  { id: 'blue', bg: 'linear-gradient(135deg, rgba(191, 219, 254, 0.9), rgba(147, 197, 253, 0.9))', text: 'dark' },
-  { id: 'cyan', bg: 'linear-gradient(135deg, rgba(165, 243, 252, 0.9), rgba(103, 232, 249, 0.9))', text: 'dark' },
-  { id: 'green', bg: 'linear-gradient(135deg, rgba(167, 243, 208, 0.9), rgba(110, 231, 183, 0.9))', text: 'dark' },
-  { id: 'lime', bg: 'linear-gradient(135deg, rgba(217, 249, 157, 0.9), rgba(190, 242, 100, 0.9))', text: 'dark' },
-  { id: 'silver', bg: 'linear-gradient(135deg, rgba(226, 232, 240, 0.9), rgba(203, 213, 225, 0.9))', text: 'dark' },
-  { id: 'dark', bg: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95))', text: 'light' },
-];
-
 function App() {
-  const [notes, setNotes] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [theme, setTheme] = useState('theme-glass-light');
   const [customBg, setCustomBg] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showTrash, setShowTrash] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showNetwork, setShowNetwork] = useState(false);
   const [torLogs, setTorLogs] = useState([]);
   const [torCircuits, setTorCircuits] = useState([]);
   const logsEndRef = useRef(null);
-  const [maxZIndex, setMaxZIndex] = useState(1);
-  const [showNotes, setShowNotes] = useState(false);
   const [customColors, setCustomColors] = useState({
     bg: '#1a1a1a',
     panel: 'rgba(30, 30, 30, 0.85)',
@@ -47,11 +24,7 @@ function App() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (window.electron && window.electron.loadNotes) {
-        const savedNotes = await window.electron.loadNotes();
-        if (savedNotes && savedNotes.length > 0) {
-          setNotes(savedNotes);
-        }
+      if (window.electron && window.electron.loadSettings) {
         const settings = await window.electron.loadSettings();
         if (settings) {
           if (settings.theme) setTheme(settings.theme);
@@ -84,14 +57,7 @@ function App() {
     }
   }, [torLogs, showNetwork]);
 
-  useEffect(() => {
-    if (loaded && window.electron && window.electron.saveNotes) {
-      const timer = setTimeout(() => {
-        window.electron.saveNotes(notes);
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [notes, loaded]);
+
 
   const changeTheme = (newTheme) => {
     setTheme(newTheme);
@@ -121,50 +87,7 @@ function App() {
     }
   };
 
-  const addNote = () => {
-    const newNote = {
-      id: uuidv4(),
-      text: '',
-      x: Math.floor(Math.random() * 200) + 50,
-      y: Math.floor(Math.random() * 200) + 50,
-      width: 250,
-      height: 250,
-      color: NOTE_COLORS[0],
-      isMinimized: false,
-      isEditing: true,
-      isDeleted: false,
-      alarmTime: null
-    };
-    setNotes([...notes, newNote]);
-  };
 
-  const updateNote = (id, updates) => {
-    setNotes(notes.map(note => note.id === id ? { ...note, ...updates } : note));
-  };
-
-  const bringToFront = (id) => {
-    const newZ = maxZIndex + 1;
-    setMaxZIndex(newZ);
-    updateNote(id, { zIndex: newZ });
-  };
-
-  const moveToTrash = (id) => {
-    updateNote(id, { isDeleted: true });
-  };
-  
-  const restoreNote = (id) => {
-    updateNote(id, { isDeleted: false });
-  };
-
-  const hardDeleteNote = (id) => {
-    setNotes(notes.filter(note => note.id !== id));
-  };
-
-  const emptyTrash = () => {
-    if (window.confirm(t.emptyTrashConfirm)) {
-      setNotes(notes.filter(note => !note.isDeleted));
-    }
-  };
 
   const handleWindowMinimize = () => {
     if (window.electron && window.electron.windowMinimize) window.electron.windowMinimize();
@@ -178,8 +101,7 @@ function App() {
     if (window.electron && window.electron.windowClose) window.electron.windowClose();
   };
 
-  const activeNotes = notes.filter(n => !n.isDeleted && n.text.toLowerCase().includes(searchQuery.toLowerCase()));
-  const deletedNotes = notes.filter(n => n.isDeleted);
+
 
   const getDynamicStyles = () => {
     let styles = {};
@@ -202,7 +124,6 @@ function App() {
       style={getDynamicStyles()}
       onClick={() => {
         if (showSettings) setShowSettings(false);
-        if (showTrash) setShowTrash(false);
         if (showNetwork) setShowNetwork(false);
       }}
     >
@@ -210,30 +131,13 @@ function App() {
         <span className="title-text">Noxe</span>
         
         <div className="title-bar-center">
-          {showNotes && (
-            <div className="search-bar">
-              <MdSearch className="search-icon" />
-              <input 
-                type="text" 
-                placeholder={t.searchPlaceholder} 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          )}
         </div>
 
         <div className="title-bar-actions" style={{ marginRight: '16px' }}>
-          <button className="title-action-btn" onClick={(e) => { e.stopPropagation(); setShowNotes(!showNotes); }} title="Note" style={{ color: showNotes ? '#ffcc00' : 'var(--text-secondary)' }}>
-            <MdStickyNote2 />
-          </button>
-          <button className="title-action-btn" onClick={(e) => { e.stopPropagation(); setShowNetwork(!showNetwork); setShowTrash(false); setShowSettings(false); fetchCircuits(); }} title="Tor Network & Logs" style={{ color: showNetwork ? '#4ade80' : 'var(--text-secondary)' }}>
+          <button className="title-action-btn" onClick={(e) => { e.stopPropagation(); setShowNetwork(!showNetwork); setShowSettings(false); fetchCircuits(); }} title="Tor Network & Logs" style={{ color: showNetwork ? '#4ade80' : 'var(--text-secondary)' }}>
             <MdTerminal />
           </button>
-          <button className="title-action-btn" onClick={(e) => { e.stopPropagation(); setShowTrash(!showTrash); setShowSettings(false); setShowNetwork(false); }} title={t.trash} style={{ color: showTrash ? '#ff5555' : 'var(--text-secondary)' }}>
-            <MdDelete />
-          </button>
-          <button className="title-action-btn" onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); setShowTrash(false); setShowNetwork(false); }} title={t.settings} style={{ color: showSettings ? '#fff' : 'var(--text-secondary)' }}>
+          <button className="title-action-btn" onClick={(e) => { e.stopPropagation(); setShowSettings(!showSettings); setShowNetwork(false); }} title={t.settings} style={{ color: showSettings ? '#fff' : 'var(--text-secondary)' }}>
             <MdSettings />
           </button>
         </div>
@@ -244,28 +148,6 @@ function App() {
           <button className="window-btn close" onClick={handleWindowClose}><MdClose /></button>
         </div>
       </div>
-
-      {showNotes && (
-        <>
-          <div className="board">
-            {activeNotes.map(note => (
-              <Note
-                key={note.id}
-                note={note}
-                updateNote={updateNote}
-                deleteNote={moveToTrash}
-                bringToFront={bringToFront}
-                colors={NOTE_COLORS}
-                t={t}
-              />
-            ))}
-          </div>
-
-          <button className="add-btn" onClick={addNote} title={t.addNote}>
-            <MdAdd />
-          </button>
-        </>
-      )}
 
       {/* Settings Panel */}
       {showSettings && (
@@ -328,43 +210,7 @@ function App() {
         </div>
       )}
 
-      {/* Trash Panel */}
-      {showTrash && (
-        <div className="trash-panel" onClick={(e) => e.stopPropagation()}>
-          <div className="trash-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h3 style={{ margin: 0, fontSize: '18px' }}>{t.trash} <span style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 'normal' }}>({deletedNotes.length})</span></h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {deletedNotes.length > 0 && (
-                <button onClick={emptyTrash} style={{ background: 'none', color: '#ef4444', border: 'none', cursor: 'pointer', fontSize: '13px', padding: '4px 8px' }}>
-                  {t.emptyAll}
-                </button>
-              )}
-              <button onClick={() => setShowTrash(false)} className="close-btn" style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '20px', padding: 0 }}><MdClose /></button>
-            </div>
-          </div>
-          <div className="trash-list">
-            {deletedNotes.length === 0 ? (
-              <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px', marginTop: '20px' }}>{t.trashEmpty}</p>
-            ) : null}
-            {deletedNotes.map(note => (
-              <div key={note.id} className="trash-item">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden', paddingRight: '8px' }}>
-                  <span style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {note.text ? note.text.substring(0, 40) : t.emptyNote}
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    {new Date(note.deletedAt || Date.now()).toLocaleDateString()}
-                  </span>
-                </div>
-                <div className="trash-actions">
-                  <button onClick={() => restoreNote(note.id)} title={t.restore} className="trash-action-btn"><MdRestore size={18} /></button>
-                  <button onClick={() => hardDeleteNote(note.id)} title={t.deletePermanently} className="trash-action-btn danger"><MdDeleteForever size={18} /></button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+
 
       {/* Network / Terminal Panel */}
       {showNetwork && (
@@ -408,9 +254,9 @@ function App() {
         </div>
       )}
 
-      {/* Chat Panel - always rendered to keep connection alive, hidden when notes are shown */}
-      <div style={{ display: showNotes ? 'none' : 'block' }}>
-        <Chat isChatVisible={!showNotes} t={t} />
+      {/* Chat Panel */}
+      <div>
+        <Chat isChatVisible={true} t={t} />
       </div>
     </div>
   );
