@@ -56,10 +56,8 @@ app.whenReady().then(() => {
   try {
     if (fs.existsSync(chatFilePath)) {
       const data = JSON.parse(fs.readFileSync(chatFilePath, 'utf-8'));
-      const allowRequests = !!data.allowIncomingRequests;
-      const blockedContacts = data.blockedContacts || [];
       const acceptedContacts = (data.contacts || []).map(c => c.id);
-      updateTorSecurityState(allowRequests, blockedContacts, acceptedContacts);
+      updateTorSecurityState(acceptedContacts);
     }
   } catch (e) { console.error(e); }
 
@@ -221,10 +219,8 @@ ipcMain.handle('save-chat-data', (event, data) => {
     fs.writeFileSync(chatFilePath, JSON.stringify(data, null, 2));
     
     if (data) {
-       const allowRequests = !!data.allowIncomingRequests;
-       const blockedContacts = data.blockedContacts || [];
        const acceptedContacts = (data.contacts || []).map(c => c.id);
-       updateTorSecurityState(allowRequests, blockedContacts, acceptedContacts);
+       updateTorSecurityState(acceptedContacts);
     }
     
     return true;

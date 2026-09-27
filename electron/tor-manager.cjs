@@ -15,10 +15,7 @@ let mainWindow = null;
 let currentTorDataDir = null;
 
 // Settings & Security state
-let allowIncomingRequests = false;
-let blockedContacts = new Set();
 let acceptedContacts = new Set(); 
-const rateLimits = new Map(); // peerOnion -> timestamp
 const pendingConnections = new Map(); // peerOnion -> Promise
 
 let SOCKS_PORT = 0;
@@ -128,48 +125,18 @@ Log notice stdout
           const type = payload.type || 'MESSAGE'; 
           const message = payload.message || { text: payload.text }; 
 
-          // 2. Blocklist Check
-          if (blockedContacts.has(peerOnion)) {
-            console.log(`[Tor Anti-Spam] Dropped connection from blocked peer: ${peerOnion}`);
-            socket.destroy();
-            return;
-          }
-
-          // 3. Known Contact Check & Rate Limiting
+          // 3. Known Contact Check
           const isKnown = acceptedContacts.has(peerOnion);
           
           if (!isKnown) {
-             if (!allowIncomingRequests) {
-                console.log(`[Tor Anti-Spam] Dropped request from ${peerOnion}. Incoming requests disabled.`);
-                return; // just ignore, don't destroy socket so we don't break other pending messages in the same buffer
-             }
-
-             // If they are unknown, they can ONLY send CONTACT_REQUEST
-             if (type !== 'CONTACT_REQUEST') {
-                 console.log(`[Tor Anti-Spam] Ignored non-handshake message from unknown peer ${peerOnion} (Type: ${type})`);
-                 return; // Just ignore, but do NOT trigger rate limit
-             }
-
-             // Rate limiting (1 request per 2 minutes per onion)
-             const lastReq = rateLimits.get(peerOnion) || 0;
-             const now = Date.now();
-             if (now - lastReq < 120000) {
-                 console.log(`[Tor Anti-Spam] Rate limited request from ${peerOnion}`);
-                 return;
-             }
-             rateLimits.set(peerOnion, now);
+             console.log(`[Tor Anti-Spam] Ignored message from unknown peer ${peerOnion}`);
+             return; 
           }
           
           console.log(`Ricevuto da ${peerOnion} (Type: ${type})`);
           
           if (mainWindow && !mainWindow.isDestroyed()) {
-            if (type === 'CONTACT_REQUEST') {
-               mainWindow.webContents.send('tor-on-contact-request', { peerId: peerOnion, profileName: message.profileName });
-            } else if (type === 'CONTACT_ACCEPTED') {
-               mainWindow.webContents.send('tor-on-contact-accepted', peerOnion);
-            } else {
-               mainWindow.webContents.send('tor-on-message', { peerId: peerOnion, message });
-            }
+             mainWindow.webContents.send('tor-on-message', { peerId: peerOnion, message });
           }
         } catch (e) {
           console.error("Errore parsing messaggio:", e);
@@ -360,23 +327,7 @@ function setupIPC() {
     return !!socket;
   });
 
-  ipcMain.handle('tor-send-handshake', async (event, peerOnion, type, profileName) => {
-    const socket = await getOrCreateTorSocket(peerOnion);
-    if (!socket) return false;
-    
-    const payload = JSON.stringify({ 
-        from: onionAddress, 
-        type: type, // 'CONTACT_REQUEST' or 'CONTACT_ACCEPTED'
-        message: { profileName } 
-    }) + '\n\n';
-    
-    try {
-      socket.write(payload);
-      return true;
-    } catch(err) {
-      return false;
-    }
-  });
+
 
   ipcMain.handle('tor-send-message', async (event, peerOnion, messageObj) => {
     const socket = await getOrCreateTorSocket(peerOnion);
@@ -395,9 +346,7 @@ function setupIPC() {
   });
 }
 
-function updateTorSecurityState(allowRequests, blockedSet, acceptedSet) {
-    allowIncomingRequests = allowRequests;
-    blockedContacts = new Set(blockedSet || []);
+function updateTorSecurityState(acceptedSet) {
     acceptedContacts = new Set(acceptedSet || []);
 }
 

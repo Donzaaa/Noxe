@@ -31,14 +31,5 @@ contextBridge.exposeInMainWorld('electron', {
   torOnPeerDisconnected: (callback) => {
     ipcRenderer.removeAllListeners('tor-on-peer-disconnected');
     ipcRenderer.on('tor-on-peer-disconnected', (_event, peerId) => callback(peerId));
-  },
-  torSendHandshake: (peerId, type, profileName) => ipcRenderer.invoke('tor-send-handshake', peerId, type, profileName),
-  torOnContactRequest: (callback) => {
-    ipcRenderer.removeAllListeners('tor-on-contact-request');
-    ipcRenderer.on('tor-on-contact-request', (_event, data) => callback(data));
-  },
-  torOnContactAccepted: (callback) => {
-    ipcRenderer.removeAllListeners('tor-on-contact-accepted');
-    ipcRenderer.on('tor-on-contact-accepted', (_event, peerId) => callback(peerId));
   }
 });

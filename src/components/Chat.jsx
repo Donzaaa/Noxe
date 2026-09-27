@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   MdSend, MdContentCopy, MdCheck, MdPersonAdd, MdCircle, MdDeleteForever, 
-  MdAttachFile, MdTimer, MdTimerOff, MdMic, MdMicOff, MdFileDownload, MdEdit
+  MdAttachFile, MdTimer, MdTimerOff, MdMic, MdMicOff, MdFileDownload, MdEdit,
+  MdBookmark, MdBookmarkBorder
 } from 'react-icons/md';
 import './Chat.css';
 
@@ -13,24 +14,17 @@ export default function Chat({ isChatVisible, t }) {
   const [onlineIds, setOnlineIds] = useState(new Set());
   const [activeContactId, setActiveContactId] = useState(null);
   const [messagesByContact, setMessagesByContact] = useState({});
-  const [mutualPeers, setMutualPeers] = useState(new Set());
   const [input, setInput] = useState('');
   const [addCode, setAddCode] = useState('');
   const [showAddPanel, setShowAddPanel] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  // Security & Contact Requests
-  const [allowIncomingRequests, setAllowIncomingRequests] = useState(false);
-  const [blockedContacts, setBlockedContacts] = useState([]);
-  const [pendingRequests, setPendingRequests] = useState([]);
-  const [showRequestsTab, setShowRequestsTab] = useState(false);
-  
+
   // Custom Prompt State
   const [promptConfig, setPromptConfig] = useState(null);
   const [promptValue, setPromptValue] = useState("");
   
   // New Feature States
-  const [isEphemeral, setIsEphemeral] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -42,28 +36,29 @@ export default function Chat({ isChatVisible, t }) {
   const contactsRef = useRef(contacts);
   const myNameRef = useRef(myName);
   const myProfilePicRef = useRef(myProfilePic);
-  const mutualPeersRef = useRef(mutualPeers);
-  const allowIncomingRequestsRef = useRef(allowIncomingRequests);
-  const blockedContactsRef = useRef(blockedContacts);
 
-  useEffect(() => { isChatVisibleRef.current = isChatVisible; }, [isChatVisible]);
-  useEffect(() => { activeContactIdRef.current = activeContactId; }, [activeContactId]);
-  useEffect(() => { contactsRef.current = contacts; }, [contacts]);
-  useEffect(() => { myNameRef.current = myName; }, [myName]);
-  useEffect(() => { myProfilePicRef.current = myProfilePic; }, [myProfilePic]);
-  useEffect(() => { mutualPeersRef.current = mutualPeers; }, [mutualPeers]);
-  useEffect(() => { allowIncomingRequestsRef.current = allowIncomingRequests; }, [allowIncomingRequests]);
-  useEffect(() => { blockedContactsRef.current = blockedContacts; }, [blockedContacts]);
 
   const deleteMessage = useCallback((contactId, msgTime) => {
     setMessagesByContact(prev => {
       const next = { ...prev };
       if (next[contactId]) {
-        next[contactId] = next[contactId].filter(m => m.time !== msgTime);
+        next[contactId] = next[contactId].filter(m => m.time !== msgTime || m.saved);
       }
       return next;
     });
   }, []);
+
+  const toggleSaveMessage = (contactId, msgTime) => {
+    setMessagesByContact(prev => {
+      const next = { ...prev };
+      if (next[contactId]) {
+        next[contactId] = next[contactId].map(m => 
+          m.time === msgTime ? { ...m, saved: !m.saved } : m
+        );
+      }
+      return next;
+    });
+  };
 
   // Load chat data and ID from backend
   useEffect(() => {
@@ -75,8 +70,7 @@ export default function Chat({ isChatVisible, t }) {
         if (data && data.contacts) savedContacts = data.contacts;
         if (data && data.myName) setMyName(data.myName);
         if (data && data.myProfilePic) setMyProfilePic(data.myProfilePic);
-        if (data && data.allowIncomingRequests !== undefined) setAllowIncomingRequests(data.allowIncomingRequests);
-        if (data && data.blockedContacts) setBlockedContacts(data.blockedContacts);
+        if (data && data.savedMessages) setMessagesByContact(data.savedMessages);
       }
       setContacts(savedContacts);
 
@@ -124,7 +118,7 @@ export default function Chat({ isChatVisible, t }) {
                   c.id === peerId ? { ...c, name: message.name || c.name, avatar: message.avatar } : c
                 ));
                 
-                if (!mutualPeersRef.current.has(peerId) && window.electron.torSendMessage) {
+                if (window.electron.torSendMessage) {
                   window.electron.torSendMessage(peerId, { 
                     type: 'profile_sync_ack', 
                     name: myNameRef.current, 
@@ -153,10 +147,6 @@ export default function Chat({ isChatVisible, t }) {
                 ...prev,
                 [peerId]: [...(prev[peerId] || []), newMsg],
               }));
-              
-              if (newMsg.ephemeral) {
-                setTimeout(() => deleteMessage(peerId, msgTime), 10000);
-              }
 
               if (!isChatVisibleRef.current || activeContactIdRef.current !== peerId || document.hidden) {
                 if (window.electron.showNotification) {
@@ -165,26 +155,6 @@ export default function Chat({ isChatVisible, t }) {
                 }
               }
             });
-
-            if (window.electron.torOnContactRequest) {
-              window.electron.torOnContactRequest(({ peerId, profileName }) => {
-                if (contactsRef.current.some(c => c.id === peerId) || blockedContactsRef.current.includes(peerId)) return;
-                setPendingRequests(prev => {
-                  if (prev.some(p => p.id === peerId)) return prev;
-                  return [...prev, { id: peerId, name: profileName || peerId.substring(0, 8) }];
-                });
-                if (window.electron.showNotification) {
-                  window.electron.showNotification('New Request', `Chat request from ${profileName || peerId.substring(0, 8)}`);
-                }
-              });
-            }
-
-            if (window.electron.torOnContactAccepted) {
-              window.electron.torOnContactAccepted((peerId) => {
-                setMutualPeers(prev => new Set(prev).add(peerId));
-                setOnlineIds(prev => new Set(prev).add(peerId));
-              });
-            }
 
             savedContacts.forEach(c => window.electron.torConnect(c.id));
           } else {
@@ -197,19 +167,26 @@ export default function Chat({ isChatVisible, t }) {
     init();
   }, [deleteMessage]);
 
-  // Save contacts (exclude ephemeral messages from history, though we only save contacts here)
+  // Save contacts and saved messages
   useEffect(() => {
     if (!myId) return;
     if (window.electron && window.electron.saveChatData) {
       const timer = setTimeout(() => {
+        // Salva solo i messaggi che hanno "saved: true"
+        const savedMessagesOnly = {};
+        Object.keys(messagesByContact).forEach(contactId => {
+          const msgs = messagesByContact[contactId].filter(m => m.saved);
+          if (msgs.length > 0) savedMessagesOnly[contactId] = msgs;
+        });
+
         window.electron.saveChatData({ 
-          myId, contacts, myName, myProfilePic, 
-          allowIncomingRequests, blockedContacts 
+          myId, contacts, myName, myProfilePic,
+          savedMessages: savedMessagesOnly
         });
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [myId, contacts, myName, myProfilePic, allowIncomingRequests, blockedContacts]);
+  }, [myId, contacts, myName, myProfilePic, messagesByContact]);
 
   const tryConnect = useCallback((contactId) => {
     if (window.electron && window.electron.torConnect) window.electron.torConnect(contactId);
@@ -222,35 +199,9 @@ export default function Chat({ isChatVisible, t }) {
     setContacts((prev) => [...prev, newContact]);
     tryConnect(code);
     
-    // Send Handshake
-    if (window.electron && window.electron.torSendHandshake) {
-       window.electron.torSendHandshake(code, 'CONTACT_REQUEST', myNameRef.current);
-    }
-
     setAddCode('');
     setShowAddPanel(false);
     setActiveContactId(code);
-  };
-
-  const acceptRequest = (peerId, profileName) => {
-    const newContact = { id: peerId, name: profileName || 'Contact ' + peerId.substring(0, 6), addedAt: Date.now() };
-    setContacts((prev) => [...prev, newContact]);
-    setPendingRequests(prev => prev.filter(p => p.id !== peerId));
-    setMutualPeers(prev => new Set(prev).add(peerId));
-    
-    if (window.electron && window.electron.torSendHandshake) {
-       window.electron.torSendHandshake(peerId, 'CONTACT_ACCEPTED', myNameRef.current);
-    }
-    tryConnect(peerId);
-  };
-
-  const blockRequest = (peerId) => {
-    setBlockedContacts(prev => [...prev, peerId]);
-    setPendingRequests(prev => prev.filter(p => p.id !== peerId));
-  };
-
-  const unblockRequest = (peerId) => {
-    setBlockedContacts(prev => prev.filter(id => id !== peerId));
   };
 
   const renameContact = (e, contactId, currentName) => {
@@ -300,10 +251,6 @@ export default function Chat({ isChatVisible, t }) {
         ...prev,
         [activeContactId]: [...(prev[activeContactId] || []), newMsg],
       }));
-      
-      if (payload.ephemeral) {
-        setTimeout(() => deleteMessage(activeContactId, msgTime), 10000);
-      }
     }
   };
 
@@ -343,7 +290,7 @@ export default function Chat({ isChatVisible, t }) {
 
   const sendMessage = () => {
     if (!input.trim()) return;
-    dispatchMessage({ type: 'text', text: input, ephemeral: isEphemeral });
+    dispatchMessage({ type: 'text', text: input });
     setInput('');
   };
 
@@ -360,8 +307,7 @@ export default function Chat({ isChatVisible, t }) {
       dispatchMessage({ 
         type: file.type.startsWith('image/') ? 'image' : 'file', 
         filename: file.name, 
-        data: reader.result, 
-        ephemeral: isEphemeral 
+        data: reader.result 
       });
     };
     reader.readAsDataURL(file);
@@ -387,7 +333,7 @@ export default function Chat({ isChatVisible, t }) {
           const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
           const reader = new FileReader();
           reader.onload = () => {
-            dispatchMessage({ type: 'voice', data: reader.result, ephemeral: isEphemeral });
+            dispatchMessage({ type: 'voice', data: reader.result });
           };
           reader.readAsDataURL(blob);
           stream.getTracks().forEach(track => track.stop());
@@ -408,13 +354,24 @@ export default function Chat({ isChatVisible, t }) {
   const activeMessages = activeContactId ? messagesByContact[activeContactId] || [] : [];
   const activeContact = contacts.find((c) => c.id === activeContactId);
   const activeIsOnline = activeContactId ? onlineIds.has(activeContactId) : false;
-  const activeIsMutual = activeContactId ? mutualPeers.has(activeContactId) : false;
-  const canChat = activeIsOnline && activeIsMutual;
+  const canChat = activeIsOnline;
 
   const renderMessageContent = (msg) => {
     switch (msg.type) {
       case 'image':
-        return <img src={msg.data} alt="Sent image" style={{ maxWidth: '100%', borderRadius: '8px' }} />;
+        return (
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <img src={msg.data} alt="Sent image" style={{ maxWidth: '100%', borderRadius: '8px' }} />
+            <a 
+              href={msg.data} 
+              download={msg.filename || "image.png"} 
+              style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.6)', color: 'white', padding: '6px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}
+              title="Download Image"
+            >
+              <MdFileDownload size={20} />
+            </a>
+          </div>
+        );
       case 'file':
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -468,86 +425,26 @@ export default function Chat({ isChatVisible, t }) {
       <div className="chat-body">
         <div className="chat-contacts">
           
-          <div className="chat-contacts-header-actions" style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <button 
-              onClick={() => setShowRequestsTab(false)}
-              style={{ background: 'none', border: 'none', color: !showRequestsTab ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: !showRequestsTab ? 'bold' : 'normal' }}
+          {contacts.length === 0 && <p className="chat-empty-hint">{t.noContacts}</p>}
+          {contacts.map((c) => (
+            <div
+              key={c.id}
+              className={`chat-contact-item ${activeContactId === c.id ? 'active' : ''}`}
+              onClick={() => setActiveContactId(c.id)}
             >
-              Contacts
-            </button>
-            <button 
-              onClick={() => setShowRequestsTab(true)}
-              style={{ background: 'none', border: 'none', color: showRequestsTab ? 'var(--text-primary)' : 'var(--text-secondary)', cursor: 'pointer', fontWeight: showRequestsTab ? 'bold' : 'normal', position: 'relative' }}
-            >
-              Requests
-              {pendingRequests.length > 0 && (
-                <span style={{ position: 'absolute', top: '-5px', right: '-15px', background: 'var(--danger-color)', color: 'white', borderRadius: '50%', padding: '2px 6px', fontSize: '10px' }}>
-                  {pendingRequests.length}
-                </span>
-              )}
-            </button>
-          </div>
-
-          {!showRequestsTab ? (
-            <>
-              {contacts.length === 0 && <p className="chat-empty-hint">{t.noContacts}</p>}
-              {contacts.map((c) => (
-                <div
-                  key={c.id}
-                  className={`chat-contact-item ${activeContactId === c.id ? 'active' : ''}`}
-                  onClick={() => setActiveContactId(c.id)}
-                >
-                  <div className="contact-avatar-container">
-                    {c.avatar ? <img src={c.avatar} alt={c.name} className="contact-avatar" /> : <div className="contact-avatar-placeholder">{c.name.charAt(0).toUpperCase()}</div>}
-                    <MdCircle className={`status-dot ${onlineIds.has(c.id) ? 'online' : 'offline'}`} />
-                  </div>
-                  <span className="contact-name">{c.name}</span>
-                  <button className="delete-contact-btn" onClick={(e) => renameContact(e, c.id, c.name)} title="Rename Contact" style={{ color: 'inherit', marginRight: '4px' }}>
-                    <MdEdit />
-                  </button>
-                  <button className="delete-contact-btn" onClick={(e) => deleteContact(e, c.id)} title={t.remove}>
-                    <MdDeleteForever />
-                  </button>
-                </div>
-              ))}
-            </>
-          ) : (
-            <div className="chat-requests-tab" style={{ padding: '15px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-primary)', marginBottom: '15px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={allowIncomingRequests} 
-                  onChange={(e) => setAllowIncomingRequests(e.target.checked)}
-                />
-                {t.allowIncomingRequests}
-              </label>
-
-              {pendingRequests.length === 0 && <p className="chat-empty-hint" style={{ fontSize: '13px' }}>No pending requests.</p>}
-              
-              {pendingRequests.map(req => (
-                <div key={req.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 'bold' }}>{req.name}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {req.id.substring(0,16)}...</span>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '5px' }}>
-                    <button onClick={() => acceptRequest(req.id, req.name)} style={{ flex: 1, padding: '6px', background: 'var(--accent-color)', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t.accept}</button>
-                    <button onClick={() => blockRequest(req.id)} style={{ flex: 1, padding: '6px', background: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t.block}</button>
-                  </div>
-                </div>
-              ))}
-
-              {blockedContacts.length > 0 && (
-                <div style={{ marginTop: '20px' }}>
-                  <h4 style={{ color: 'var(--text-secondary)', marginBottom: '10px', fontSize: '12px', textTransform: 'uppercase' }}>Blocked Contacts</h4>
-                  {blockedContacts.map(id => (
-                    <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,68,68,0.1)', padding: '8px', borderRadius: '6px', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--danger-color)' }}>{id.substring(0,16)}...</span>
-                      <button onClick={() => unblockRequest(id)} style={{ padding: '4px 8px', background: 'transparent', border: '1px solid var(--danger-color)', color: 'var(--danger-color)', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}>Unblock</button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="contact-avatar-container">
+                {c.avatar ? <img src={c.avatar} alt={c.name} className="contact-avatar" /> : <div className="contact-avatar-placeholder">{c.name.charAt(0).toUpperCase()}</div>}
+                <MdCircle className={`status-dot ${onlineIds.has(c.id) ? 'online' : 'offline'}`} />
+              </div>
+              <span className="contact-name">{c.name}</span>
+              <button className="delete-contact-btn" onClick={(e) => renameContact(e, c.id, c.name)} title="Rename Contact" style={{ color: 'inherit', marginRight: '4px' }}>
+                <MdEdit />
+              </button>
+              <button className="delete-contact-btn" onClick={(e) => deleteContact(e, c.id)} title={t.remove}>
+                <MdDeleteForever />
+              </button>
             </div>
-          )}
+          ))}
         </div>
 
         <div className="chat-thread">
@@ -564,15 +461,25 @@ export default function Chat({ isChatVisible, t }) {
                   )}
                   <span>{activeContact?.name}</span>
                 </div>
-                <span className={`status-badge ${activeIsOnline ? (activeIsMutual ? 'status-connected' : 'status-waiting') : 'status-waiting'}`}>
-                  {activeIsOnline ? (activeIsMutual ? t.onlineP2P : 'Waiting for approval...') : t.offlineWaiting}
+                <span className={`status-badge ${activeIsOnline ? 'status-connected' : 'status-waiting'}`}>
+                  {activeIsOnline ? t.onlineP2P : t.offlineWaiting}
                 </span>
               </div>
               <div className="chat-messages">
                 {activeMessages.map((msg, i) => (
                   <div key={i} className={`chat-msg chat-msg-${msg.from}`}>
-                    {msg.ephemeral && <MdTimer size={14} style={{ float: 'right', opacity: 0.5, marginLeft: '8px' }} />}
-                    {renderMessageContent(msg)}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ flex: 1, wordBreak: 'break-word' }}>
+                        {renderMessageContent(msg)}
+                      </div>
+                      <button 
+                        onClick={() => toggleSaveMessage(activeContactId, msg.time)}
+                        style={{ background: 'none', border: 'none', color: msg.saved ? 'var(--accent-color)' : 'rgba(255,255,255,0.3)', cursor: 'pointer', padding: '2px', display: 'flex' }}
+                        title={msg.saved ? "Unsave Message" : "Save Message to Disk"}
+                      >
+                        {msg.saved ? <MdBookmark size={18} /> : <MdBookmarkBorder size={18} />}
+                      </button>
+                    </div>
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
@@ -586,13 +493,7 @@ export default function Chat({ isChatVisible, t }) {
                   onChange={handleFileSelect}
                 />
                 
-                <button 
-                  onClick={() => setIsEphemeral(!isEphemeral)} 
-                  style={{ width: '40px', height: '40px', background: isEphemeral ? 'var(--danger-color)' : 'transparent', border: isEphemeral ? 'none' : '1px solid var(--accent-color)', color: isEphemeral ? 'white' : 'var(--accent-color)' }}
-                  title="Self-Destructing Messages (10s)"
-                >
-                  {isEphemeral ? <MdTimer /> : <MdTimerOff />}
-                </button>
+
 
                 <button 
                   onClick={() => fileInputRef.current.click()} 
@@ -614,7 +515,7 @@ export default function Chat({ isChatVisible, t }) {
 
                 <input
                   type="text"
-                  placeholder={canChat ? t.msgEncrypted : (activeIsOnline ? "User must add you to contacts first..." : t.waitingPeer)}
+                  placeholder={canChat ? t.msgEncrypted : t.waitingPeer}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
