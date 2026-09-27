@@ -37,6 +37,14 @@ export default function Chat({ isChatVisible, t }) {
   const myNameRef = useRef(myName);
   const myProfilePicRef = useRef(myProfilePic);
 
+  useEffect(() => {
+    isChatVisibleRef.current = isChatVisible;
+    activeContactIdRef.current = activeContactId;
+    contactsRef.current = contacts;
+    myNameRef.current = myName;
+    myProfilePicRef.current = myProfilePic;
+  }, [isChatVisible, activeContactId, contacts, myName, myProfilePic]);
+
 
   const deleteMessage = useCallback((contactId, msgTime) => {
     setMessagesByContact(prev => {
@@ -102,11 +110,7 @@ export default function Chat({ isChatVisible, t }) {
               if (!isContact) {
                 return; // Ignore messages from peers not in contacts
               }
-              
-              setMutualPeers(prev => {
-                if (!prev.has(peerId)) return new Set(prev).add(peerId);
-                return prev;
-              });
+
 
               setOnlineIds(prev => {
                 if (!prev.has(peerId)) return new Set(prev).add(peerId);
